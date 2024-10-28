@@ -1,0 +1,210 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brain Tumor Toolbox</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* 使内容整体居中 */
+            font-size: 18px; /* 调整字体大小 */
+        }
+        .file-selector {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            justify-content: flex-start; /* 改为左对齐 */
+            width: 100%; /* 使文件选择器占据全宽 */
+            max-width: 500px; /* 设置最大宽度以保持美观 */
+        }
+        .file-path {
+            /* 使文本框占据剩余空间 */
+            margin-right: 10px; /* 添加文本框与按钮之间的间距 */
+            padding-left: 5px; /* 添加左侧内边距 */
+            width: 250px; /* 设置最大宽度 */
+            max-width: 250px; /* 确保最大宽度为280px */
+            font-size: 16px; /* 增加输入框字体大小 */
+        }
+        .file-selector label {
+            flex-grow: 1;
+            
+            margin-right: 10px; /* 添加标签与文本框之间的间距 */
+            font-size: 16px; /* 增加标签字体大小 */
+        }
+        button {
+            width: 150px; /* 保持按钮宽度 */
+            padding: 10px; /* 增加按钮内边距 */
+            font-size: 16px; /* 增加按钮字体大小 */
+            background-color: #4CAF50; /* 按钮背景颜色 */
+            color: white; /* 按钮字体颜色 */
+            border: none; /* 去掉边框 */
+            border-radius: 5px; /* 圆角按钮 */
+            cursor: pointer; /* 鼠标悬停时显示手型 */
+            transition: background-color 0.3s; /* 添加过渡效果 */
+        }
+        button:hover {
+            background-color: #45a049; /* 鼠标悬停时的背景颜色 */
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px; /* 开关的宽度 */
+            height: 34px; /* 开关的高度 */
+        }
+        .switch input {
+            opacity: 0; /* 隐藏原始复选框 */
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc; /* 开关的背景颜色 */
+            transition: .4s; /* 动画效果 */
+            border-radius: 34px; /* 圆角 */
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px; /* 滑块的高度 */
+            width: 26px; /* 滑块的宽度 */
+            left: 4px; /* 滑块的左边距 */
+            bottom: 4px; /* 滑块的下边距 */
+            background-color: white; /* 滑块的颜色 */
+            transition: .4s; /* 动画效果 */
+            border-radius: 50%; /* 滑块圆形 */
+        }
+        input:checked + .slider {
+            background-color: #2196F3; /* 开关打开时的背景颜色 */
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px); /* 滑块移动 */
+        }
+    </style>
+</head>
+<body>
+    <h1>Brain Tumor Toolbox</h1>
+    
+    <div class="file-selector">
+        <label for="file-path-1">T1:</label>
+        <input type="text" id="file-path-1" class="file-path" readonly />
+        <button id="select-file-1">Choose T1</button>
+    </div>
+
+    <div class="file-selector">
+        <label for="file-path-2">T1C:</label>
+        <input type="text" id="file-path-2" class="file-path" readonly />
+        <button id="select-file-2">Choose T1C</button>
+    </div>
+
+    <div class="file-selector">
+        <label for="file-path-3">T2:</label>
+        <input type="text" id="file-path-3" class="file-path" readonly />
+        <button id="select-file-3">Choose T2</button>
+    </div>
+
+    <div class="file-selector">
+        <label for="file-path-4">FLAIR:</label>
+        <input type="text" id="file-path-4" class="file-path" readonly />
+        <button id="select-file-4">Choose FLAIR</button>
+    </div>
+
+    <!-- <button id="submit-paths">Sumbit Paths</button> 新增提交按钮 -->
+    <div class="toggle-container" style="display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 500px; margin-bottom: 10px;">
+        <label for="brainmask-toggle" style="margin-right: 10px;">Need brainmask:</label> <!-- 固定间距 -->
+        <div style="display: flex; align-items: center; flex-grow: 1;">
+            <label class="switch"> <!-- 调整 margin-left 保持固定间距 -->
+                <input type="checkbox" id="brainmask-toggle" checked /> <!-- 新增开关，默认打开 -->
+                <span class="slider"></span>
+            </label>
+        </div>
+        <button id="start-registration" style="margin-left: auto;">Start Registration</button> <!-- 右对齐 -->
+    </div>
+    <textarea id="status-display" rows="10" cols="50" readonly></textarea> <!-- 新增状态显示文本框 -->
+
+    <script>
+        const { ipcRenderer } = require('electron');
+        const filePaths = {}; // 用于存储文件路径的字典
+
+        // 为每个按钮添加事件监听器
+        for (let i = 1; i <= 4; i++) {
+            document.getElementById(`select-file-${i}`).addEventListener('click', () => {
+                ipcRenderer.send('open-file-dialog', i); // 发送按钮编号
+            });
+        }
+
+        // 监听所选文件路径的返回
+        ipcRenderer.on('selected-file', (event, path, index) => {
+            const keys = ['T1', 'T1C', 'T2', 'FLAIR']; // 定义对应的标签
+            const key = keys[index - 1]; // 根据索引获取对应的标签
+            filePaths[key] = path; // 将路径存储到字典中
+            
+            // 提取文件名并更新输入框
+            const fileName = path.split('/').pop(); // 获取文件名
+            document.getElementById(`file-path-${index}`).value = fileName; // 显示文件名
+        });
+
+        // 提交路径到 Flask 后端
+        // document.getElementById('submit-paths').addEventListener('click', () => {
+        //     fetch('http://localhost:5000/api/upload_paths', {
+        //         method: 'POST',
+        //         headers: {
+        //             'Content-Type': 'application/json',
+        //         },
+        //         body: JSON.stringify({ paths: filePaths }), // 发送路径数组
+        //     })
+        //     .catch((error) => {
+        //         console.error('Error:', error);
+        //     });
+        // });
+
+        // 开始注册并发送开关状态到后端
+        document.getElementById('start-registration').addEventListener('click', () => {
+            const requiredKeys = ['T1', 'T1C', 'T2', 'FLAIR'];
+            const allFilesSelected = requiredKeys.every(key => filePaths[key]);
+
+            if (!allFilesSelected) {
+                alert('Make sure all files are provided.'); // 提示用户
+                return; // 终止后续操作
+            }
+            const brainmaskNeeded = document.getElementById('brainmask-toggle').checked; // 获取开关状态
+            fetch('http://localhost:5000/api/start_registration', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ paths:filePaths, brainmask: brainmaskNeeded }), // 发送开关状态
+            })
+            .then(response => {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+                const statusDisplay = document.getElementById('status-display');
+                statusDisplay.value = ""; // 清空文本框
+
+                function read() {
+                    reader.read().then(({ done, value }) => {
+                        if (done) {
+                            console.log("Stream finished");
+                            return;
+                        }
+                        statusDisplay.value += decoder.decode(value); // 更新文本框
+                        read(); // 继续读取
+                    });
+                }
+
+                read(); // 开始读取
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+            });
+        });
+    </script>
+</body>
+</html>
